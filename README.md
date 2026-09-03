@@ -20,7 +20,9 @@ Zone radius is ignored. Names are case-sensitive and must end in a numeric flag.
 
 ## Moving strobes
 
-To attach a strobe to a moving ground vehicle or ship, select its trigger zone and set **LINK UNIT** to that unit. The script refreshes the linked zone's center every flash; its existing zone name still selects the controlling flag.
+To attach a strobe to a moving ground vehicle or ship, select its trigger zone and set **LINK UNIT** to that unit. The script refreshes the linked zone's center every flash and uses the unit model's bounding-box height to place the strobe above its roof. Its existing zone name still selects the controlling flag.
+
+The extra clearance is `mount_clearance = 1` meter near the top of the script; adjust it only if a particular model needs it.
 
 ## Details
 

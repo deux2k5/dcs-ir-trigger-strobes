@@ -12,6 +12,7 @@ IR_RUNWAY = {
   zone_prefix = "IR_STROBE_",
   flash_seconds = 0.5,
   period_seconds = 1,
+  mount_clearance = 1,
   country = "USA",
   static_type = "Invisible FARP",
   shape_name = "invisiblefarp",
@@ -22,7 +23,16 @@ IR_RUNWAY = {
 
 local R = IR_RUNWAY
 
-local function collectPoints(zones, getZone)
+local function findUnitName(node, id)
+  if type(node) ~= "table" then return nil end
+  if node.unitId == id then return node.name end
+  for _, child in pairs(node) do
+    local name = findUnitName(child, id)
+    if name then return name end
+  end
+end
+
+local function collectPoints(zones, getZone, units)
   local points = {}
   for _, zone in pairs(zones or {}) do
     local name = zone.name
@@ -35,6 +45,7 @@ local function collectPoints(zones, getZone)
           flag = tonumber(flag),
           x = liveZone.point.x,
           y = liveZone.point.z,
+          unit_name = zone.linkUnit and findUnitName(units, zone.linkUnit),
         }
       end
     end
@@ -46,6 +57,15 @@ end
 local function refreshPoint(marker, getZone)
   local zone = getZone(marker.name)
   if zone then marker.x, marker.y = zone.point.x, zone.point.z end
+end
+
+local function mountedHeight(marker, getUnit)
+  local unit = marker.unit_name and getUnit(marker.unit_name)
+  if not unit or not unit:isExist() then return nil end
+  local desc = unit:getDesc()
+  local box = desc and desc.box
+  if not box then return nil end
+  return unit:getPoint().y + box.max.y + math.abs(box.min.y) + R.mount_clearance
 end
 
 local function report(message)
@@ -137,12 +157,13 @@ local function flash(_, now)
     if marker.enabled then
       refreshPoint(marker, trigger.misc.getZone)
       local height = land.getHeight({ x = marker.x, y = marker.y })
-      local origin = { x = marker.x, y = height + 2, z = marker.y }
+      local originY = mountedHeight(marker, Unit.getByName) or height + 2
+      local origin = { x = marker.x, y = originY, z = marker.y }
       local ok, spot = pcall(
         Spot.createInfraRed,
         source,
         worldToLocal(position, origin),
-        { x = marker.x, y = height + 1, z = marker.y }
+        { x = marker.x, y = originY - 1, z = marker.y }
       )
       if ok and spot then R.spots[#R.spots + 1] = spot end
     end
@@ -191,7 +212,7 @@ local function watchFlags(_, now)
 end
 
 local function init()
-  local points = collectPoints(env.mission.triggers.zones, trigger.misc.getZone)
+  local points = collectPoints(env.mission.triggers.zones, trigger.misc.getZone, env.mission.coalition)
   if #points == 0 then
     report("no zones named " .. R.zone_prefix .. "<flag>")
     return
@@ -210,16 +231,24 @@ local function selfTest()
     { name = "IR_STROBE_9003" },
     { name = "NOT_A_STROBE" },
     { name = "IR_STROBE_BAD" },
-    { name = "IR_STROBE_9002" },
+    { name = "IR_STROBE_9002", linkUnit = 42 },
   }
   local points = collectPoints(fakeZones, function(name)
     if name == "IR_STROBE_9002" then return { point = { x = 10, z = 20 } } end
     return { point = { x = 30, z = 40 } }
-  end)
+  end, { units = {{ unitId = 42, name = "Test Truck" }} })
   assert(#points == 2 and points[1].name == "IR_STROBE_9002")
   assert(points[1].flag == 9002 and points[1].x == 10 and points[1].y == 20)
+  assert(points[1].unit_name == "Test Truck")
   refreshPoint(points[1], function() return { point = { x = 50, z = 60 } } end)
   assert(points[1].x == 50 and points[1].y == 60)
+  assert(mountedHeight(points[1], function()
+    return {
+      isExist = function() return true end,
+      getDesc = function() return { box = { min = { y = -0.5 }, max = { y = 1.5 } } } end,
+      getPoint = function() return { y = 100 } end,
+    }
+  end) == 103)
   assert(R.static_type == "Invisible FARP")
   local localPoint = worldToLocal(
     {
@@ -235,7 +264,7 @@ local function selfTest()
 end
 
 if rawget(_G, "trigger") and rawget(_G, "timer") and rawget(_G, "Spot")
-  and rawget(_G, "StaticObject") and rawget(_G, "land") then
+  and rawget(_G, "StaticObject") and rawget(_G, "Unit") and rawget(_G, "land") then
   init()
 else
   selfTest()
