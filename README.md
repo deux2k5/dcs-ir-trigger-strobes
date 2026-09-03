@@ -18,6 +18,10 @@ Examples:
 
 Zone radius is ignored. Names are case-sensitive and must end in a numeric flag.
 
+## Moving strobes
+
+To attach a strobe to a moving ground vehicle or ship, select its trigger zone and set **LINK UNIT** to that unit. The script refreshes the linked zone's center every flash; its existing zone name still selects the controlling flag.
+
 ## Details
 
 - One zone creates one strobe.

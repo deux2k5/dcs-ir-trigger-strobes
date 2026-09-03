@@ -2,6 +2,7 @@
 -- Load once with MISSION START -> DO SCRIPT FILE.
 -- The number in each zone name is its flag: IR_STROBE_9002 uses flag 9002.
 -- Zone radius is ignored; place and name each zone manually.
+-- Link a zone to a moving unit in the Mission Editor to make its strobe follow.
 
 if IR_RUNWAY and IR_RUNWAY.shutdown then
   pcall(IR_RUNWAY.shutdown)
@@ -40,6 +41,11 @@ local function collectPoints(zones, getZone)
   end
   table.sort(points, function(a, b) return a.name < b.name end)
   return points
+end
+
+local function refreshPoint(marker, getZone)
+  local zone = getZone(marker.name)
+  if zone then marker.x, marker.y = zone.point.x, zone.point.z end
 end
 
 local function report(message)
@@ -129,6 +135,7 @@ local function flash(_, now)
   local position = source:getPosition()
   for _, marker in ipairs(R.points) do
     if marker.enabled then
+      refreshPoint(marker, trigger.misc.getZone)
       local height = land.getHeight({ x = marker.x, y = marker.y })
       local origin = { x = marker.x, y = height + 2, z = marker.y }
       local ok, spot = pcall(
@@ -211,6 +218,8 @@ local function selfTest()
   end)
   assert(#points == 2 and points[1].name == "IR_STROBE_9002")
   assert(points[1].flag == 9002 and points[1].x == 10 and points[1].y == 20)
+  refreshPoint(points[1], function() return { point = { x = 50, z = 60 } } end)
+  assert(points[1].x == 50 and points[1].y == 60)
   assert(R.static_type == "Invisible FARP")
   local localPoint = worldToLocal(
     {
@@ -231,4 +240,3 @@ if rawget(_G, "trigger") and rawget(_G, "timer") and rawget(_G, "Spot")
 else
   selfTest()
 end
-
