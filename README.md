@@ -1,50 +1,72 @@
-# DCS IR Trigger-Zone Strobes
+# DCS I2 IR Trigger-Zone Strobes
 
-A small, dependency-free DCS World mission script. Each specially named trigger zone places one independently controlled blinking IR strobe at the zone center.
+Flag-controlled IR strobes using the I2 beacon from the standalone
+[USLANTCOM tech asset pack](https://github.com/deux2k5/uslantcom_asset_pack/tree/main/Mods/tech/USLANTCOM%20Asset%20Pack).
+Every spawned source is an I2; no invisible FARP or FARP fallback is used.
+No MOOSE or MIST dependency. The tech asset pack is required on all clients;
+the USA aircraft pack is not required.
 
-## Setup
+[Download the tech asset pack](https://github.com/deux2k5/uslantcom_asset_pack/releases/tag/i2-v1.0.0).
+Extract its Mods folder into Saved Games/DCS so the plugin is at
+`Mods/tech/USLANTCOM Asset Pack/entry.lua`. Remove the old aircraft-pack I2
+registration if you installed the earlier development build; the tech pack
+README gives migration instructions. Do not leave both copies registered.
 
-1. Add `IR_Runway.lua` to a `MISSION START` trigger using **DO SCRIPT FILE**.
-2. Place a trigger zone wherever you want a strobe.
-3. Name it `IR_STROBE_<flag>`.
-4. Set that flag to `1` to turn the strobe on and `0` to turn it off.
+## Mission Setup
+1. Install the updated USLANTCOM tech asset pack and restart DCS.
+2. Create a trigger zone named IR_STROBE_9002 where you want the beacon.
+   A full-scale I2 prop spawns at the zone center when this script loads,
+   even with its flag off. Radius is ignored. Spawn country defaults to USA.
+3. Add MISSION START -> DO SCRIPT FILE -> IR_Runway.lua.
+4. Set flag 9002 to 1 to flash, or 0 to stop. Each numeric suffix controls
+   its own flag. Any nonzero numeric value enables it.
+5. Re-select DO SCRIPT FILE after updating this file, then save the mission
+   to embed the new version. Installing the pack alone does not load mission Lua.
 
-Examples:
+## Manual Placement
+Instead of a zone, place Static Objects -> Fortifications ->
+I2 Beacon - USLANTCOM and set its object/unit name to IR_STROBE_9002.
+The UNIT name is used, not the group name. A ground-unit I2 fortification
+with that unit name also works. Use manual placement to choose heading,
+country or a supported elevated placement. Use a separate flag/name for
+each beacon. A placed beacon overrides a zone with the same name, so it
+does not spawn a duplicate. Its current position and orientation determine
+the IR target location. Destroying the beacon stops its flashes.
 
-| Trigger-zone name | Controlling flag |
-| --- | ---: |
-| `IR_STROBE_9002` | `9002` |
-| `IR_STROBE_9003` | `9003` |
+## Moving Zones
+Existing zones linked to vehicles/ships retain the upstream moving IR
+marker behavior. Each gets an I2 source prop at its initial zone center.
+The IR offset follows the linked zone; the physical static prop stays at
+its spawn position. This does not attach a physical I2 to the vehicle.
+Missing/destroyed linked units or destroyed source beacons stop the marker.
 
-Zone radius is ignored. Names are case-sensitive and must end in a numeric flag.
+## Timing And Appearance
+Default: 0.5 seconds on, once per second; flags checked every 0.25 seconds.
+The head is only 50 x 50 x 32 mm. Test on pavement with terrain clutter
+clear. The IR target is 10 mm above the head, adjustable with ir_clearance
+at the top of the Lua. Every native Spot.createInfraRed call uses that
+marker's I2 beacon as its source. All spawned objects are I2 beacons;
+there is no shared source, FARP spawning or FARP fallback.
+This is an IR-spot approximation, not a flashing EDM lens or a simulation
+of the manufacturer's multiple wavelengths and angular output pattern.
+NVG/FLIR visibility, occlusion, range and multiplayer behavior require
+in-game testing; the offline checks do not establish those properties.
 
-## Moving strobes
+Only load this version once. It replaces the original IR_Runway.lua;
+do not also load the upstream version. Re-loading shuts down its previous
+timers/spots and reuses existing props. Stopping the script or setting
+flags to zero leaves the physical props in place. Runtime-created props
+are mission-session objects, not additions saved into Mission Editor.
+Late-activated/manually spawned beacons after script initialization are
+not discovered automatically. Enable/load their mission objects first.
+Restart the mission after replacing the older script to clear any FARP
+that the older version already spawned; this version does not delete it.
 
-To attach a strobe to a moving ground vehicle or ship, select its trigger zone and set **LINK UNIT** to that unit. The script refreshes the linked zone's center every flash and uses the unit model's bounding-box height to place the strobe above its roof. Its existing zone name still selects the controlling flag.
+If a spawn fails, check the on-screen message and dcs.log. Reserved names
+IR_STROBE_<flag>__I2 must not belong to unrelated objects. The script will
+not replace such objects. All clients need the USLANTCOM tech asset pack for its model.
 
-The extra clearance is `mount_clearance = 1` meter near the top of the script; adjust it only if a particular model needs it.
-
-## Details
-
-- One zone creates one strobe.
-- Each strobe is controlled independently.
-- One runtime `Invisible FARP` supplies the DCS source object for every IR spot.
-- No MOOSE or MIST dependency.
-- Default flash timing is 0.5 seconds on every 1 second; edit the values near the top of the script if desired.
-- The source country defaults to USA.
-
-After changing the Lua file, reselect it in **DO SCRIPT FILE** and save the mission so DCS embeds the updated copy.
-
-## Quick check
-
-With Lua installed:
-
-```console
+## Offline Check
 lua IR_Runway.lua
-```
-
-Expected output:
-
-```text
-OK: IR_STROBE_9002 is controlled by flag 9002
-```
+Integration check:
+lua verify_ir_beacon.lua IR_Runway.lua

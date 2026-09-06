@@ -1,4 +1,6 @@
--- One IR strobe at the center of every trigger zone named IR_STROBE_...
+-- USLANTCOM tech asset pack I2 integration of https://github.com/deux2k5/dcs-ir-trigger-strobes
+-- All IR_STROBE_<flag> zones spawn an I2 beacon; placed I2 objects with
+-- the same naming convention work without zones (use the UNIT/object name).
 -- Load once with MISSION START -> DO SCRIPT FILE.
 -- The number in each zone name is its flag: IR_STROBE_9002 uses flag 9002.
 -- Zone radius is ignored; place and name each zone manually.
@@ -14,9 +16,9 @@ IR_RUNWAY = {
   period_seconds = 1,
   mount_clearance = 1,
   country = "USA",
-  static_type = "Invisible FARP",
-  shape_name = "invisiblefarp",
-  source_name = "IR_RUNWAY_SOURCE",
+  beacon_type = "USLANTCOM_I2_BEACON",
+  beacon_height = 0.032, -- meters: export origin is under the beacon head
+  ir_clearance = 0.01, -- IR target just above the housing; tune in DCS if needed
   active = false,
   spots = {},
 }
@@ -46,6 +48,7 @@ local function collectPoints(zones, getZone, units)
           x = liveZone.point.x,
           y = liveZone.point.z,
           unit_name = zone.linkUnit and findUnitName(units, zone.linkUnit),
+          linked = zone.linkUnit ~= nil,
         }
       end
     end
@@ -84,6 +87,78 @@ local function worldToLocal(position, point)
   }
 end
 
+local function alive(object)
+  return object and object:isExist() and object:getLife() > 0
+end
+
+local function getObject(name)
+  return StaticObject.getByName(name) or Unit.getByName(name)
+end
+
+local function collectBeacons(node, points)
+  if type(node) ~= "table" then return end
+  local flag = type(node.name) == "string" and node.name:match("^" .. R.zone_prefix .. "(%d+)$")
+  if node.type == R.beacon_type and flag then
+    local marker
+    for _, point in ipairs(points) do
+      if point.name == node.name then marker = point; break end
+    end
+    if not marker then
+      marker = { name = node.name, flag = tonumber(flag), x = node.x, y = node.y }
+      points[#points + 1] = marker
+    end
+    -- A named, placed beacon takes precedence over a same-named zone.
+    marker.beacon_name = node.name
+    marker.linked, marker.unit_name = false, nil
+  else
+    for _, child in pairs(node) do collectBeacons(child, points) end
+  end
+end
+
+local function prepareBeacon(marker)
+  if marker.beacon_name then return end
+  local name = marker.name .. "__I2"
+  marker.beacon_name = name
+  local existing = getObject(name)
+  if existing then
+    if existing:getTypeName() ~= R.beacon_type then
+      report("name already in use; not replacing " .. name)
+      marker.failed = true
+    end
+    return -- Reuse existing props and wrecks on script reload.
+  end
+  local countryId = country.id[R.country]
+  local ok, object = false, nil
+  if countryId then
+    ok, object = pcall(coalition.addStaticObject, countryId, {
+      name = name, type = R.beacon_type, shape_name = R.beacon_type,
+      category = "Fortifications", x = marker.x, y = marker.y,
+      heading = 0, dead = false, rate = 1,
+    })
+  end
+  if not ok or not object then
+    marker.failed = true
+    report("could not spawn " .. name .. "; check USLANTCOM tech asset pack installation and country")
+  end
+end
+
+local function targetPoint(marker, beacon)
+  if marker.linked then
+    if not alive(marker.unit_name and Unit.getByName(marker.unit_name)) then return nil end
+    refreshPoint(marker, trigger.misc.getZone)
+    local height = land.getHeight({ x = marker.x, y = marker.y })
+    local originY = mountedHeight(marker, Unit.getByName) or height + 2
+    return { x = marker.x, y = originY - 1, z = marker.y }
+  end
+  local position = beacon:getPosition()
+  local height = R.beacon_height + R.ir_clearance
+  return {
+    x = position.p.x + position.y.x * height,
+    y = position.p.y + position.y.y * height,
+    z = position.p.z + position.y.z * height,
+  }
+end
+
 local function clearSpots()
   for _, spot in ipairs(R.spots) do
     pcall(function() spot:destroy() end)
@@ -92,80 +167,29 @@ local function clearSpots()
   R.off_timer = nil
 end
 
-local function getSource()
-  if R.source and R.source:isExist() then return R.source end
-
-  local unitName = R.source_name .. "-1"
-  local source = StaticObject.getByName(unitName)
-  if source and source:isExist() then
-    R.source = source
-    return source
-  end
-
-  local countryId = country.id[R.country]
-  if not countryId then
-    report("unknown country " .. R.country)
-    return nil
-  end
-
-  local point = R.source_point
-  local data = {
-    name = R.source_name,
-    visible = false,
-    hidden = true,
-    dead = false,
-    x = point.x,
-    y = point.y,
-    units = {{
-      name = unitName,
-      category = "Heliports",
-      type = R.static_type,
-      shape_name = R.shape_name,
-      heliport_callsign_id = 1,
-      heliport_frequency = 127.5,
-      heliport_modulation = 0,
-      rate = 100,
-      x = point.x,
-      y = point.y,
-      heading = 0,
-    }},
-  }
-
-  local ok
-  ok, source = pcall(coalition.addGroup, countryId, -1, data)
-  if not ok or not source then
-    report("could not create Invisible FARP source")
-    return nil
-  end
-  R.source = StaticObject.getByName(unitName) or source
-  return R.source
-end
-
 local function flash(_, now)
   if not R.active then return nil end
 
-  local source = R.source
-  if not source or not source:isExist() then
-    R.active = false
-    R.pulse_timer = nil
-    return nil
-  end
-
   clearSpots()
-  local position = source:getPosition()
   for _, marker in ipairs(R.points) do
-    if marker.enabled then
-      refreshPoint(marker, trigger.misc.getZone)
-      local height = land.getHeight({ x = marker.x, y = marker.y })
-      local originY = mountedHeight(marker, Unit.getByName) or height + 2
-      local origin = { x = marker.x, y = originY, z = marker.y }
+    local source = marker.enabled and not marker.failed and getObject(marker.beacon_name)
+    local target = alive(source) and source:getTypeName() == R.beacon_type and targetPoint(marker, source)
+    if target then
+      local position = source:getPosition()
+      -- Each I2 is its own IR source. Linked zones retain a virtual moving offset.
+      local origin = { x = target.x, y = target.y + 1, z = target.z }
       local ok, spot = pcall(
         Spot.createInfraRed,
         source,
         worldToLocal(position, origin),
-        { x = marker.x, y = originY - 1, z = marker.y }
+        target
       )
-      if ok and spot then R.spots[#R.spots + 1] = spot end
+      if ok and spot then
+        R.spots[#R.spots + 1] = spot
+      elseif not marker.spot_error then
+        marker.spot_error = true
+        report("could not create IR spot for " .. marker.name)
+      end
     end
   end
 
@@ -175,7 +199,6 @@ end
 
 function R.start()
   if R.active then return true end
-  if not getSource() then return false end
   R.active = true
   R.pulse_timer = timer.scheduleFunction(flash, nil, timer.getTime() + 0.01)
   return true
@@ -202,26 +225,26 @@ local function watchFlags(_, now)
     anyEnabled = anyEnabled or marker.enabled
   end
 
-  if anyEnabled and not R.active and not R.start_failed then
-    R.start_failed = not R.start()
-  elseif not anyEnabled then
-    R.start_failed = false
-    if R.active then R.stop() end
+  if anyEnabled and not R.active then
+    R.start()
+  elseif not anyEnabled and R.active then
+    R.stop()
   end
   return now + 0.25
 end
 
 local function init()
-  local points = collectPoints(env.mission.triggers.zones, trigger.misc.getZone, env.mission.coalition)
+  local points = collectPoints((env.mission.triggers or {}).zones, trigger.misc.getZone, env.mission.coalition)
+  collectBeacons(env.mission.coalition, points)
   if #points == 0 then
-    report("no zones named " .. R.zone_prefix .. "<flag>")
+    report("no zones or I2 beacons named " .. R.zone_prefix .. "<flag>")
     return
   end
 
   R.points = points
-  R.source_point = { x = points[1].x, y = points[1].y }
+  for _, marker in ipairs(points) do prepareBeacon(marker) end
   if env and env.info then
-    env.info(string.format("[IR STROBES] ready: %d individually controlled zones", #points))
+    env.info(string.format("[IR STROBES] ready: %d individually controlled markers", #points))
   end
   R.watch_timer = timer.scheduleFunction(watchFlags, nil, timer.getTime() + 0.1)
 end
@@ -249,7 +272,7 @@ local function selfTest()
       getPoint = function() return { y = 100 } end,
     }
   end) == 103)
-  assert(R.static_type == "Invisible FARP")
+  assert(R.beacon_type == "USLANTCOM_I2_BEACON")
   local localPoint = worldToLocal(
     {
       p = { x = 10, y = 20, z = 30 },
