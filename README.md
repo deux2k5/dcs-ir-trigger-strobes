@@ -28,3 +28,20 @@ Use the script from this repository or the ZIP's mod `Scripts` folder.
 Default flashing is 0.5 seconds on, once per second. IR endpoints coincide
 to remove the pointer beam. View the effect through night vision.
 After updating the script, re-select it in DO SCRIPT FILE and save the mission.
+
+## Moving strobe (vehicle or ship)
+
+1. Place the vehicle or ship and give it a route.
+2. Create a trigger zone named `IR_STROBE_9003`, centred on that unit's starting
+   position. The zone radius does not matter.
+3. In the zone settings, use **LINK UNIT** to select the specific vehicle or ship.
+4. Load `IR_Runway.lua` using the mission setup above. Set flag `9003` to `1`
+   to flash, or `0` to stop. Use another numeric suffix for a separate flag.
+
+The IR flashes follow the linked zone as the unit moves. Only the light effect
+moves: the spawned I2 model stays at the zone's initial position. Flashes stop
+if the linked unit or source beacon is destroyed.
+
+Use a linked zone for this setup; do not also place a static beacon with the
+same name, because that would override the moving zone. Keep runway endpoint
+zones fixed on the ground.
