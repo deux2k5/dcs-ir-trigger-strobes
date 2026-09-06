@@ -1,21 +1,30 @@
 # DCS I2 IR Trigger-Zone Strobes
 
-Flag-controlled IR strobes using the I2 beacon from the standalone
-[USLANTCOM tech asset pack](https://github.com/deux2k5/uslantcom_asset_pack/tree/main/Mods/tech/USLANTCOM%20Asset%20Pack).
+Flag-controlled IR strobes with the standalone **USLANTCOM I2 Beacon** DCS tech mod.
+The model, textures, native static registration and script are all included here.
+No private repository access, USA aircraft pack, MOOSE or MIST is required.
 Every spawned source is an I2; no invisible FARP or FARP fallback is used.
-No MOOSE or MIST dependency. The tech asset pack is required on all clients;
-the USA aircraft pack is not required.
 
-[Download the tech asset pack](https://github.com/deux2k5/uslantcom_asset_pack/releases/tag/i2-v1.0.2).
-Extract its Mods folder into Saved Games/DCS so the plugin is at
-`Mods/tech/USLANTCOM Asset Pack/entry.lua`. Remove the old aircraft-pack I2
-registration if you installed the earlier development build; the tech pack
-README gives migration instructions. Do not leave both copies registered.
+[Download the standalone I2 mod and script](https://github.com/deux2k5/dcs-ir-trigger-strobes/releases/tag/i2-v1.0.2).
+Extract the ZIP's `Mods` folder into your active Saved Games/DCS profile:
 
+```text
+Saved Games/DCS/Mods/tech/USLANTCOM I2 Beacon/entry.lua
+```
+
+All multiplayer clients need the mod. Install **one I2 provider only**: this
+standalone mod or the I2 included in the USLANTCOM Asset Pack. They use the
+same `USLANTCOM_I2_BEACON` unit type so existing missions remain compatible.
+When switching, move the old I2-providing mod outside `Mods` first. For an
+older aircraft-pack build, remove its I2 registration and I2 files while
+keeping the aircraft. Fully restart DCS after changing installed mods.
+
+The download includes `Scripts/IR_Runway.lua` inside the mod folder. Embed
+that file using DO SCRIPT FILE; installing the model does not load mission Lua.
 
 ## Mission setup
 
-1. Install the updated USLANTCOM tech asset pack and restart DCS.
+1. Install the standalone I2 mod and restart DCS.
 2. Create a trigger zone named IR_STROBE_9002 where you want the beacon.
    A full-scale I2 prop spawns at the zone center when this script loads,
    even with its flag off. Radius is ignored. Spawn country defaults to USA.
@@ -76,9 +85,24 @@ that the older version already spawned; this version does not delete it.
 
 If a spawn fails, check the on-screen message and dcs.log. Reserved names
 IR_STROBE_<flag>__I2 must not belong to unrelated objects. The script will
-not replace such objects. All clients need the USLANTCOM tech asset pack for its model.
+not replace such objects. All clients need the standalone I2 mod or the compatible asset-pack I2.
 
 ## Offline Check
 lua IR_Runway.lua
 Full integration check in the development workspace:
 lua verify_ir_beacon.lua IR_Runway.lua
+
+## Model
+
+The I2 assembly includes its controller and cable: 3,136 visible triangles,
+two materials and 24 collision triangles. Head dimensions are 50 x 50 x 32 mm;
+other small dimensions are photographic estimates. Native type:
+`USLANTCOM_I2_BEACON`; display name: `I2 Beacon - USLANTCOM`.
+[Manufacturer dimension reference](https://tplogic.com/wp-content/uploads/brochureI2Beacon_v2.pdf).
+
+## Build the standalone ZIP
+
+Run `python build_release.py`. It packages only this repository's I2 mod,
+the current root `IR_Runway.lua` and these instructions into
+`dist/USLANTCOM_I2_Beacon_Standalone.zip`, with SHA-256 integrity checks.
+Run `lua verify_i2_entry.lua "Mods/tech/USLANTCOM I2 Beacon"` to check registration.

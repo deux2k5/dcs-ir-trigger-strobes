@@ -1,4 +1,4 @@
--- USLANTCOM tech asset pack I2 integration of https://github.com/deux2k5/dcs-ir-trigger-strobes
+-- Standalone I2 IR strobes: https://github.com/deux2k5/dcs-ir-trigger-strobes
 -- All IR_STROBE_<flag> zones spawn an I2 beacon; placed I2 objects with
 -- the same naming convention work without zones (use the UNIT/object name).
 -- Load once with MISSION START -> DO SCRIPT FILE.
@@ -165,7 +165,7 @@ local function prepareBeacon(marker)
   end
   if not ok or not object then
     marker.failed = true
-    report("could not spawn " .. name .. "; check USLANTCOM tech asset pack installation and country")
+    report("could not spawn " .. name .. "; check I2 mod installation and country")
   end
 end
 
