@@ -2,7 +2,7 @@
 -- A ground-vehicle template is not a substitute for a static object definition.
 local beacon = {
     Name = "USLANTCOM_I2_BEACON",
-    DisplayName = _("I2 Beacon - USLANTCOM"),
+    DisplayName = _("IR Strobe Beacon - USLANTCOM"),
     ShapeName = "USLANTCOM_I2_BEACON",
     Life = 1,
     Rate = 1,
