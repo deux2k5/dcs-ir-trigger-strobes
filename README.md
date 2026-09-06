@@ -6,7 +6,7 @@ Every spawned source is an I2; no invisible FARP or FARP fallback is used.
 No MOOSE or MIST dependency. The tech asset pack is required on all clients;
 the USA aircraft pack is not required.
 
-[Download the tech asset pack](https://github.com/deux2k5/uslantcom_asset_pack/releases/tag/i2-v1.0.0).
+[Download the tech asset pack](https://github.com/deux2k5/uslantcom_asset_pack/releases/tag/i2-v1.0.1).
 Extract its Mods folder into Saved Games/DCS so the plugin is at
 `Mods/tech/USLANTCOM Asset Pack/entry.lua`. Remove the old aircraft-pack I2
 registration if you installed the earlier development build; the tech pack
