@@ -5,6 +5,7 @@
 -- The number in each zone name is its flag: IR_STROBE_9002 uses flag 9002.
 -- Zone radius is ignored; place and name each zone manually.
 -- Link a zone to a moving unit in the Mission Editor to make its strobe follow.
+-- IR_RWY_START + IR_RWY_END generate a runway row controlled by flag 9001.
 
 if IR_RUNWAY and IR_RUNWAY.shutdown then
   pcall(IR_RUNWAY.shutdown)
@@ -12,6 +13,8 @@ end
 
 IR_RUNWAY = {
   zone_prefix = "IR_STROBE_",
+  runway_flag = 9001,
+  runway_spacing = 30, -- meters; includes both endpoints
   flash_seconds = 0.5,
   period_seconds = 1,
   mount_clearance = 1,
@@ -74,6 +77,30 @@ end
 local function report(message)
   if env and env.error then env.error("[IR STROBES] " .. message) end
   if trigger and trigger.action then trigger.action.outText("IR strobes: " .. message, 15) end
+end
+
+local function addRunway(points, getZone)
+  local first, last = getZone("IR_RWY_START"), getZone("IR_RWY_END")
+  if not first and not last then return 0 end
+  if not first or not last then
+    report("runway needs both IR_RWY_START and IR_RWY_END zones")
+    return 0
+  end
+  local dx, dz = last.point.x - first.point.x, last.point.z - first.point.z
+  local length = math.sqrt(dx * dx + dz * dz)
+  if length == 0 or R.runway_spacing <= 0 then
+    report("runway endpoints must differ and runway_spacing must be positive")
+    return 0
+  end
+  local segments = math.ceil(length / R.runway_spacing)
+  for i = 0, segments do
+    points[#points + 1] = {
+      name = string.format("IR_RWY_%03d", i), flag = R.runway_flag,
+      x = first.point.x + dx * i / segments,
+      y = first.point.z + dz * i / segments,
+    }
+  end
+  return segments + 1
 end
 
 local function worldToLocal(position, point)
@@ -176,8 +203,8 @@ local function flash(_, now)
     local target = alive(source) and source:getTypeName() == R.beacon_type and targetPoint(marker, source)
     if target then
       local position = source:getPosition()
-      -- Each I2 is its own IR source. Linked zones retain a virtual moving offset.
-      local origin = { x = target.x, y = target.y + 1, z = target.z }
+      -- Coincident endpoints: emit the spot without a pointer beam above it.
+      local origin = target
       local ok, spot = pcall(
         Spot.createInfraRed,
         source,
@@ -236,6 +263,7 @@ end
 local function init()
   local points = collectPoints((env.mission.triggers or {}).zones, trigger.misc.getZone, env.mission.coalition)
   collectBeacons(env.mission.coalition, points)
+  R.runway_count = addRunway(points, trigger.misc.getZone)
   if #points == 0 then
     report("no zones or I2 beacons named " .. R.zone_prefix .. "<flag>")
     return

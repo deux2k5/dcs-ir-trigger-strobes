@@ -1,6 +1,7 @@
 -- Run: lua verify_ir_beacon.lua "path/to/Scripts/IR_Runway.lua"
 local script = assert(arg[1], "pass IR_Runway.lua path")
 local objects, units, events, flags, spots, errors = {}, {}, {}, {}, {}, {}
+local runwayZones = {}
 local clock, nextId, spawns, farps = 0, 0, 0, 0
 local function object(name, x, y, z, kind)
   local obj = { name = name, life = 1, point = { x = x, y = y, z = z }, kind = kind }
@@ -63,6 +64,7 @@ end
 trigger = { action = { outText = function() end }, misc = {
   getUserFlag = function(flag) return flags[flag] or 0 end,
   getZone = function(name)
+    if name == "IR_RWY_START" or name == "IR_RWY_END" then return runwayZones[name] end
     if name == "IR_STROBE_4" then return { point = units.Truck.point } end
     return { point = { x = 10, y = 100, z = 15 } }
   end,
@@ -82,7 +84,8 @@ Spot = { createInfraRed = function(source, offset, target)
     world[axis] = p.p[axis] + p.x[axis] * offset.x + p.y[axis] * offset.y + p.z[axis] * offset.z
   end
   assert(math.abs(world.x - target.x) < 1e-8 and math.abs(world.z - target.z) < 1e-8)
-  assert(math.abs(world.y - target.y - 1) < 1e-8)
+  local beamLength=math.sqrt((world.x-target.x)^2+(world.y-target.y)^2+(world.z-target.z)^2)
+  assert(beamLength<1e-8, "IR source and target must coincide: no pointer beam")
   local spot = { target = target }
   function spot:destroy() self.dead = true end
   spots[#spots + 1] = spot
@@ -132,4 +135,24 @@ advance(2.1); assert(#active() == 1 and farps == 0, "reload reuses objects and s
 units.IR_STROBE_3.life = 0
 advance(3.2); assert(#active() == 0, "destroyed placed unit must stop")
 IR_RUNWAY.shutdown(); assert(next(events) == nil and #active() == 0)
+-- Runway-only mission: both endpoints, <=30 m spacing, one flag and no beam.
+env.mission = {triggers={zones={}},coalition={}}
+runwayZones.IR_RWY_START = {point={x=200,y=100,z=300}}
+runwayZones.IR_RWY_END = {point={x=260,y=100,z=380}}
+dofile(script)
+assert(IR_RUNWAY.runway_count==5 and #IR_RUNWAY.points==5)
+local first,last=IR_RUNWAY.points[1],IR_RUNWAY.points[5]
+assert(first.x==200 and first.y==300 and last.x==260 and last.y==380)
+for i,p in ipairs(IR_RUNWAY.points) do
+  assert(p.flag==9001)
+  if i>1 then
+    local prev=IR_RUNWAY.points[i-1]
+    assert(math.sqrt((p.x-prev.x)^2+(p.y-prev.y)^2)<=30)
+  end
+end
+advance(3.4);assert(#active()==0)
+flags[9001]=1;advance(3.6);assert(#active()==5)
+flags[9001]=0;advance(3.9);assert(#active()==0)
+IR_RUNWAY.shutdown();assert(next(events)==nil)
 print("OK: I2 spawn/reuse, placed static + ground unit, flags, timing, destruction, linked movement, failures, reload and cleanup")
+print("OK: flag 9001 runway row, endpoints/spacing and coincident IR endpoints (no beam)")

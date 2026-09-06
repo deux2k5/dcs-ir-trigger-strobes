@@ -6,13 +6,15 @@ Every spawned source is an I2; no invisible FARP or FARP fallback is used.
 No MOOSE or MIST dependency. The tech asset pack is required on all clients;
 the USA aircraft pack is not required.
 
-[Download the tech asset pack](https://github.com/deux2k5/uslantcom_asset_pack/releases/tag/i2-v1.0.1).
+[Download the tech asset pack](https://github.com/deux2k5/uslantcom_asset_pack/releases/tag/i2-v1.0.2).
 Extract its Mods folder into Saved Games/DCS so the plugin is at
 `Mods/tech/USLANTCOM Asset Pack/entry.lua`. Remove the old aircraft-pack I2
 registration if you installed the earlier development build; the tech pack
 README gives migration instructions. Do not leave both copies registered.
 
-## Mission Setup
+
+## Mission setup
+
 1. Install the updated USLANTCOM tech asset pack and restart DCS.
 2. Create a trigger zone named IR_STROBE_9002 where you want the beacon.
    A full-scale I2 prop spawns at the zone center when this script loads,
@@ -23,11 +25,20 @@ README gives migration instructions. Do not leave both copies registered.
 5. Re-select DO SCRIPT FILE after updating this file, then save the mission
    to embed the new version. Installing the pack alone does not load mission Lua.
 
+## Runway Row (Flag 9001)
+Place two zones named IR_RWY_START and IR_RWY_END. The script places a
+single row of I2 beacons between their centers, including both endpoints.
+All use flag 9001: nonzero = flashing, zero = off. Default maximum spacing
+is 30 meters; adjust runway_spacing near the top of the script as needed.
+The runway row coexists with independently controlled IR_STROBE_<flag>
+zones and manually named beacons. No runway is generated if both endpoint
+zones are absent. Keep these endpoint zones fixed on the ground.
+
 ## Manual Placement
 Instead of a zone, place Static Objects -> Fortifications ->
 I2 Beacon - USLANTCOM and set its object/unit name to IR_STROBE_9002.
-The UNIT name is used, not the group name. A ground-unit I2 fortification
-with that unit name also works. Use manual placement to choose heading,
+The object/unit name is used, not the group name. Use the Static Objects
+placement tool for this native static structure. Use manual placement to choose heading,
 country or a supported elevated placement. Use a separate flag/name for
 each beacon. A placed beacon overrides a zone with the same name, so it
 does not spawn a duplicate. Its current position and orientation determine
@@ -46,7 +57,8 @@ The head is only 50 x 50 x 32 mm. Test on pavement with terrain clutter
 clear. The IR target is 10 mm above the head, adjustable with ir_clearance
 at the top of the Lua. Every native Spot.createInfraRed call uses that
 marker's I2 beacon as its source. All spawned objects are I2 beacons;
-there is no shared source, FARP spawning or FARP fallback.
+there is no shared source, FARP spawning or FARP fallback. IR source and
+target are coincident: there is no pointer-beam segment above the strobe.
 This is an IR-spot approximation, not a flashing EDM lens or a simulation
 of the manufacturer's multiple wavelengths and angular output pattern.
 NVG/FLIR visibility, occlusion, range and multiplayer behavior require
@@ -68,5 +80,5 @@ not replace such objects. All clients need the USLANTCOM tech asset pack for its
 
 ## Offline Check
 lua IR_Runway.lua
-Integration check:
+Full integration check in the development workspace:
 lua verify_ir_beacon.lua IR_Runway.lua
