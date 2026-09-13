@@ -5,7 +5,7 @@
 -- The number in each zone name is its flag: IR_STROBE_9002 uses flag 9002.
 -- Zone radius is ignored; place and name each zone manually.
 -- Link a zone to a moving unit in the Mission Editor to make its strobe follow.
--- IR_RWY_START + IR_RWY_END generate a runway row controlled by flag 9001.
+-- IR_RWY_START + IR_RWY_END generate a steady runway row controlled by flag 9001.
 
 if IR_RUNWAY and IR_RUNWAY.shutdown then
   pcall(IR_RUNWAY.shutdown)
@@ -15,6 +15,8 @@ IR_RUNWAY = {
   zone_prefix = "IR_STROBE_",
   runway_flag = 9001,
   runway_spacing = 30, -- meters; includes both endpoints
+  -- ponytail: assumes permanent runway props; enable if damage/scripts can remove them.
+  runway_check_health = false,
   flash_seconds = 0.5,
   period_seconds = 1,
   mount_clearance = 1,
@@ -95,7 +97,7 @@ local function addRunway(points, getZone)
   local segments = math.ceil(length / R.runway_spacing)
   for i = 0, segments do
     points[#points + 1] = {
-      name = string.format("IR_RWY_%03d", i), flag = R.runway_flag,
+      name = string.format("IR_RWY_%03d", i), flag = R.runway_flag, steady = true,
       x = first.point.x + dx * i / segments,
       y = first.point.z + dz * i / segments,
     }
@@ -169,7 +171,7 @@ local function prepareBeacon(marker)
   end
 end
 
-local function targetPoint(marker, beacon)
+local function targetPoint(marker, position)
   if marker.linked then
     if not alive(marker.unit_name and Unit.getByName(marker.unit_name)) then return nil end
     refreshPoint(marker, trigger.misc.getZone)
@@ -177,7 +179,6 @@ local function targetPoint(marker, beacon)
     local originY = mountedHeight(marker, Unit.getByName) or height + 2
     return { x = marker.x, y = originY - 1, z = marker.y }
   end
-  local position = beacon:getPosition()
   local height = R.beacon_height + R.ir_clearance
   return {
     x = position.p.x + position.y.x * height,
@@ -186,12 +187,23 @@ local function targetPoint(marker, beacon)
   }
 end
 
+local function destroySpot(spot)
+  spot:destroy()
+end
+
 local function clearSpots()
-  for _, spot in ipairs(R.spots) do
-    pcall(function() spot:destroy() end)
+  for i = #R.spots, 1, -1 do
+    pcall(destroySpot, R.spots[i])
+    R.spots[i] = nil
   end
-  R.spots = {}
   R.off_timer = nil
+end
+
+local function clearSteadySpot(marker)
+  if marker.spot then
+    pcall(destroySpot, marker.spot)
+    marker.spot, marker.source = nil, nil
+  end
 end
 
 local function flash(_, now)
@@ -199,10 +211,11 @@ local function flash(_, now)
 
   clearSpots()
   for _, marker in ipairs(R.points) do
-    local source = marker.enabled and not marker.failed and getObject(marker.beacon_name)
-    local target = alive(source) and source:getTypeName() == R.beacon_type and targetPoint(marker, source)
+    -- Runway spots survive each pulse; only individual strobes are recreated.
+    local source = marker.enabled and not marker.failed and not marker.spot and getObject(marker.beacon_name)
+    local position = alive(source) and source:getTypeName() == R.beacon_type and source:getPosition()
+    local target = position and targetPoint(marker, position)
     if target then
-      local position = source:getPosition()
       -- Coincident endpoints: emit the spot without a pointer beam above it.
       local origin = target
       local ok, spot = pcall(
@@ -212,7 +225,11 @@ local function flash(_, now)
         target
       )
       if ok and spot then
-        R.spots[#R.spots + 1] = spot
+        if marker.steady then
+          marker.spot, marker.source = spot, source
+        else
+          R.spots[#R.spots + 1] = spot
+        end
       elseif not marker.spot_error then
         marker.spot_error = true
         report("could not create IR spot for " .. marker.name)
@@ -220,7 +237,9 @@ local function flash(_, now)
     end
   end
 
-  R.off_timer = timer.scheduleFunction(function() clearSpots() end, nil, now + R.flash_seconds)
+  if #R.spots > 0 then
+    R.off_timer = timer.scheduleFunction(clearSpots, nil, now + R.flash_seconds)
+  end
   return now + R.period_seconds
 end
 
@@ -237,6 +256,7 @@ function R.stop()
   if R.off_timer then pcall(timer.removeFunction, R.off_timer) end
   R.pulse_timer, R.off_timer = nil, nil
   clearSpots()
+  for _, marker in ipairs(R.points or {}) do clearSteadySpot(marker) end
 end
 
 function R.shutdown()
@@ -247,8 +267,15 @@ end
 
 local function watchFlags(_, now)
   local anyEnabled = false
+  local flags = {} -- Read each shared flag once per poll, including flags set to zero.
   for _, marker in ipairs(R.points) do
-    marker.enabled = (tonumber(trigger.misc.getUserFlag(marker.flag)) or 0) ~= 0
+    if flags[marker.flag] == nil then
+      flags[marker.flag] = (tonumber(trigger.misc.getUserFlag(marker.flag)) or 0) ~= 0
+    end
+    marker.enabled = flags[marker.flag]
+    if marker.spot and (not marker.enabled or (R.runway_check_health and not alive(marker.source))) then
+      clearSteadySpot(marker)
+    end
     anyEnabled = anyEnabled or marker.enabled
   end
 

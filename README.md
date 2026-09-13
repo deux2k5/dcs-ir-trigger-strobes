@@ -25,11 +25,24 @@ Use the script from this repository or the ZIP's mod `Scripts` folder.
 - **Single strobe:** create a zone named `IR_STROBE_9002`. Set flag `9002` to `1`
   to flash or `0` to stop. Other `IR_STROBE_<number>` zones use their own flags.
 - **Runway:** create zones `IR_RWY_START` and `IR_RWY_END`. Flag `9001` controls
-  a row of beacons between them, spaced at most 30 metres apart.
+  a row of steady IR beacons between them, spaced at most 30 metres apart.
 - **Manual placement:** place `IR Strobe Beacon - USLANTCOM` as a static object and
   name the object `IR_STROBE_9002` to control it with flag `9002`.
 
-Default flashing is 0.5 seconds on, once per second. IR endpoints coincide
+Individual strobes flash for 0.5 seconds, once per second. Runway lights stay on
+while flag `9001` is set, reusing their IR spots to avoid creating a new spot for
+every runway beacon every second. Clearing the flag or shutting down/reloading
+the script cleans up its runway spots.
+Runway props are treated as permanent by default (`runway_check_health = false`):
+their health is checked when creating a spot, with no periodic health checks
+afterward. If damage or another script can delete your runway props, set
+`runway_check_health = true` to check active sources every 0.25 seconds and
+release their spots when destroyed. The model declares `Life = 1`; this setting
+does not make it invulnerable. Individual and vehicle/ship strobes retain their
+source/linked-unit health checks regardless of this setting.
+Shared flags are read once per poll. Flash-off timers only run when
+individual strobes actually emit a flash.
+IR endpoints coincide
 to remove the pointer beam. View the effect through night vision.
 After updating the script, re-select it in DO SCRIPT FILE and save the mission.
 Replace the old `IR_Runway.lua` selection with `IR_Strobe_Beacons.lua`; load only
