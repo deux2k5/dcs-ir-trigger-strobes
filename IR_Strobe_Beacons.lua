@@ -14,7 +14,7 @@ end
 IR_RUNWAY = {
   zone_prefix = "IR_STROBE_",
   runway_flag = 9001,
-  runway_spacing = 30, -- meters; includes both endpoints
+  runway_spacing = 60, -- meters; includes both endpoints
   -- ponytail: assumes permanent runway props; enable if damage/scripts can remove them.
   runway_check_health = false,
   flash_seconds = 0.5,
