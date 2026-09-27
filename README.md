@@ -25,7 +25,10 @@ Use the script from this repository or the ZIP's mod `Scripts` folder.
 - **Single strobe:** create a zone named `IR_STROBE_9002`. Set flag `9002` to `1`
   to flash or `0` to stop. Other `IR_STROBE_<number>` zones use their own flags.
 - **Runway:** create zones `IR_RWY_START` and `IR_RWY_END`. Flag `9001` controls
-  a row of steady IR beacons between them, spaced at most 60 metres apart.
+  a row of steady IR beacons between them. The row uses 20% of the former
+  60-metre-spacing count, rounded to the nearest whole beacon, with a minimum
+  of two to preserve both endpoints. For example, a row that used 47 beacons
+  now uses 9. `runway_spacing` sets the baseline before this reduction.
 - **Manual placement:** place `IR Strobe Beacon - USLANTCOM` as a static object and
   name the object `IR_STROBE_9002` to control it with flag `9002`.
 

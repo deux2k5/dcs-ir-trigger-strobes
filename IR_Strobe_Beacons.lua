@@ -14,7 +14,7 @@ end
 IR_RUNWAY = {
   zone_prefix = "IR_STROBE_",
   runway_flag = 9001,
-  runway_spacing = 60, -- meters; includes both endpoints
+  runway_spacing = 60, -- baseline meters before the 80% count reduction
   -- ponytail: assumes permanent runway props; enable if damage/scripts can remove them.
   runway_check_health = false,
   flash_seconds = 0.5,
@@ -94,7 +94,9 @@ local function addRunway(points, getZone)
     report("runway endpoints must differ and runway_spacing must be positive")
     return 0
   end
-  local segments = math.ceil(length / R.runway_spacing)
+  -- Keep 20% of the original count, rounded, with at least the two endpoints.
+  local count = math.max(2, math.floor((math.ceil(length / R.runway_spacing) + 1) * 0.2 + 0.5))
+  local segments = count - 1
   for i = 0, segments do
     points[#points + 1] = {
       name = string.format("IR_RWY_%03d", i), flag = R.runway_flag, steady = true,
@@ -328,6 +330,15 @@ local function selfTest()
     }
   end) == 103)
   assert(R.beacon_type == "USLANTCOM_I2_BEACON")
+  local runway = {}
+  assert(addRunway(runway, function(name)
+    return { point = { x = name == "IR_RWY_START" and 0 or 2760, z = 0 } }
+  end) == 9) -- 47 original beacons * 20%, rounded
+  assert(#runway == 9 and runway[1].x == 0 and runway[9].x == 2760)
+  local shortRunway = {}
+  assert(addRunway(shortRunway, function(name)
+    return { point = { x = name == "IR_RWY_START" and 0 or 30, z = 0 } }
+  end) == 2)
   local localPoint = worldToLocal(
     {
       p = { x = 10, y = 20, z = 30 },
@@ -338,7 +349,7 @@ local function selfTest()
     { x = 13, y = 25, z = 37 }
   )
   assert(localPoint.x == 3 and localPoint.y == 5 and localPoint.z == 7)
-  print("OK: IR_STROBE_9002 is controlled by flag 9002")
+  print("OK: individual strobe flags and 80% fewer runway beacons, preserving endpoints")
 end
 
 if rawget(_G, "trigger") and rawget(_G, "timer") and rawget(_G, "Spot")
