@@ -5,7 +5,7 @@ The model and textures are included; no aircraft asset pack is required.
 
 ## Install
 
-1. [Download the standalone ZIP](https://github.com/deux2k5/dcs-ir-trigger-strobes/releases/latest).
+1. [Download the mod ZIP](https://github.com/deux2k5/dcs-ir-trigger-strobes/releases/latest/download/USLANTCOM_IR_Strobe_Beacon_Mod.zip).
 2. Extract its `Mods` folder into your active `Saved Games/DCS` folder.
 3. Restart DCS.
 
@@ -19,8 +19,10 @@ working because the internal `USLANTCOM_I2_BEACON` type is unchanged.
 
 ## Mission setup
 
-Add **MISSION START → DO SCRIPT FILE → IR_Strobe_Beacons.lua** in the Mission Editor.
-Use the script from this repository or the ZIP's mod `Scripts` folder.
+[Download the mission script separately](https://github.com/deux2k5/dcs-ir-trigger-strobes/releases/latest/download/IR_Strobe_Beacons.lua),
+then add **MISSION START → DO SCRIPT FILE → IR_Strobe_Beacons.lua** in the Mission Editor.
+The mod ZIP contains the static object, model and textures; the mission script is a
+separate release download. You can also use the script from this repository.
 
 - **Single strobe:** create a zone named `IR_STROBE_9002`. Set flag `9002` to `1`
   to flash or `0` to stop. Other `IR_STROBE_<number>` zones use their own flags.
